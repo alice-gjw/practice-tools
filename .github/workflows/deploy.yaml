@@ -1,0 +1,45 @@
+name: Deploy to EKS
+
+on:
+  push:
+    branches: [main]
+
+env: 
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: inference-app
+  EKS_CLUSTER: alice-cluster
+
+jobs: 
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::581658239999:role/github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR 
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Build and push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: | 
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      
+      - name: Deploy to EKS
+        env: 
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: | 
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+          kubectl set image deployment/inference-app inference-app=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG 

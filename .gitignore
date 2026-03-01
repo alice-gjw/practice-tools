@@ -10,3 +10,5 @@ data/
 aws/
 awscliv2.zip
 eks-cluster-role-trust-policy.json
+github-actions-trust-policy.json
+github-actions-deploy-policy.json
